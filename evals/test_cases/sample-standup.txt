@@ -1,0 +1,29 @@
+Alice: Morning everyone. Let's do a quick standup.
+
+Bob: Hey. So yesterday I finished the database migration to PostgreSQL 16. All tests passing, deployed to staging.
+
+Alice: Nice. Any issues?
+
+Bob: One thing — the connection pooling config needs adjusting for production. I'll pair with Carol on that today.
+
+Carol: Yeah, I looked at it yesterday. We need to bump max connections from 20 to 50 and add PgBouncer. I'll have a PR up by lunch.
+
+Alice: Good. What about the auth token expiry bug? That's been open for a week.
+
+Bob: I picked that up this morning. The issue is we're checking expiry against UTC but the tokens are stamped in local time. Simple fix, just need to normalise to UTC everywhere.
+
+Carol: That explains the complaints from the APAC team — their tokens were expiring 8 hours early.
+
+Alice: Right. Bob, can you get that merged today?
+
+Bob: Should be done by end of day.
+
+Alice: Great. On my side, I had the product review with Sarah yesterday. We're going ahead with the new onboarding flow. I'll write up the spec today and share it in Slack.
+
+Carol: Does that affect the API endpoints I'm working on?
+
+Alice: Not directly, but the user profile endpoint will need a new field — onboarding_completed. We can discuss in refinement on Thursday.
+
+Carol: Sounds good.
+
+Alice: Anything else? No? Alright, good standup everyone.

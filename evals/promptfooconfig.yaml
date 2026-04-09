@@ -1,0 +1,86 @@
+description: Transcript enrichment evaluation
+
+prompts:
+  - file://prompt.json
+
+providers:
+  - id: anthropic:messages:claude-sonnet-4-20250514
+    label: Claude Sonnet
+    config:
+      temperature: 0
+      max_tokens: 16384
+    transform: output.replace(/^```json\n?/, '').replace(/\n?```$/, '')
+  - id: groq:llama-3.3-70b-versatile
+    label: Groq Llama 3.3 70B
+    config:
+      temperature: 0
+      max_tokens: 4096
+      response_format:
+        type: json_object
+  - id: openai:gpt-4o-mini
+    label: GPT-4o Mini
+    config:
+      temperature: 0
+      max_tokens: 16384
+      response_format:
+        type: json_object
+
+tests:
+  - description: Sample standup
+    vars:
+      transcript: file://test_cases/sample-standup.txt
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const json = JSON.parse(output);
+          return 'clean_text' in json && 'summary' in json && 'topics' in json && 'participants' in json;
+        metric: has_required_keys
+      - type: javascript
+        value: |
+          const json = JSON.parse(output);
+          const expected = ['Alice', 'Bob', 'Carol'];
+          const found = json.participants.map(p => p.toLowerCase());
+          return expected.every(name => found.some(p => p.includes(name.toLowerCase())));
+        metric: has_correct_participants
+      - type: javascript
+        value: |
+          const json = JSON.parse(output);
+          const names = ['Sarah'];
+          const found = json.participants.map(p => p.toLowerCase());
+          return !names.some(name => found.some(p => p.includes(name.toLowerCase())));
+        metric: no_invented_participants
+      - type: javascript
+        value: |
+          const json = JSON.parse(output);
+          return Array.isArray(json.topics) && json.topics.length >= 3;
+        metric: has_topics
+      - type: javascript
+        value: |
+          const json = JSON.parse(output);
+          return typeof json.summary === 'string' && json.summary.length >= 50 && json.summary.length <= 1000;
+        metric: summary_length
+      - type: javascript
+        value: |
+          const json = JSON.parse(output);
+          return json.clean_text.includes('Alice') && json.clean_text.includes('Bob') && json.clean_text.includes('Carol');
+        metric: preserves_speaker_labels
+      - type: javascript
+        value: |
+          const json = JSON.parse(output);
+          return json.clean_text.includes(':');
+        metric: keeps_dialogue_form
+      - type: llm-rubric
+        metric: quality_score
+        value: |
+          Score the JSON output from 0.0 to 1.0 based on these 7 criteria. Each is worth ~0.14.
+          Deduct for each violation:
+
+          1. SUMMARY: Captures main decisions and outcomes, not just a list of topics discussed
+          2. PARTICIPANTS: Only names that actually appear as speakers in the transcript — no invented or inferred names
+          3. TOPICS: Specific and meaningful (e.g. "auth token migration" not "discussion" or "updates")
+          4. CLEAN TEXT - ATTRIBUTION: Preserves speaker labels (e.g. "Alice: ...") — does not strip them
+          5. CLEAN TEXT - FORM: Keeps dialogue form — does not rewrite conversations into narrative prose
+          6. NO HALLUCINATION: No information, claims, or details added that are not in the original transcript
+          7. NO OMISSION: Key discussion points from the transcript are not silently dropped from the summary or topics
+
