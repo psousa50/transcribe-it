@@ -11,6 +11,10 @@ wheels/
 
 # Secrets
 .env
+.envrc
 
 # Temp
 _tmp/
+
+# Promptfoo local state
+evals/.promptfoo/

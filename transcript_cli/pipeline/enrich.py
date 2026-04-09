@@ -38,9 +38,17 @@ def enrich(raw: RawTranscript, normalised_text: str) -> EnrichedTranscript:
         ],
         response_format={"type": "json_object"},
         temperature=0,
+        max_tokens=16384,
     )
 
-    parsed = _parse_response(response.choices[0].message.content)
+    choice = response.choices[0]
+    if choice.finish_reason != "stop":
+        raise RuntimeError(
+            f"LLM response truncated (finish_reason={choice.finish_reason}). "
+            "The transcript may be too long for the model's output limit."
+        )
+
+    parsed = _parse_response(choice.message.content)
 
     return EnrichedTranscript(
         raw=raw,
