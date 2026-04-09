@@ -11,6 +11,11 @@ class GmailSourceConfig:
 
 
 @dataclass
+class SlackSourceConfig:
+    channel: str = ""
+
+
+@dataclass
 class LocalDestinationConfig:
     path: str = ".transcripts/"
 
@@ -19,6 +24,7 @@ class LocalDestinationConfig:
 class TranscriptConfig:
     lookback_days: int = 7
     gmail: GmailSourceConfig = field(default_factory=GmailSourceConfig)
+    slack: SlackSourceConfig = field(default_factory=SlackSourceConfig)
     local: LocalDestinationConfig = field(default_factory=LocalDestinationConfig)
 
 
@@ -44,8 +50,14 @@ def load_config(project_root: Path | None = None) -> TranscriptConfig:
             local_path = dest.get("path", local_path)
             break
 
+    slack_raw = raw.get("sources", {}).get("slack", {})
+    slack = SlackSourceConfig(
+        channel=slack_raw.get("channel", ""),
+    )
+
     return TranscriptConfig(
         lookback_days=raw.get("lookback_days", 7),
         gmail=gmail,
+        slack=slack,
         local=LocalDestinationConfig(path=local_path),
     )

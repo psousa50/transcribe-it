@@ -7,6 +7,7 @@ import typer
 from transcript_cli.config import load_config
 from transcript_cli.pipeline.enrich import enrich
 from transcript_cli.sources.gmail import build_query, fetch_transcripts, list_emails
+from transcript_cli.sources.slack import fetch_transcripts as slack_fetch, list_files as slack_list
 from transcript_cli.storage.local import DuplicateTranscriptError, persist
 
 app = typer.Typer(name="ingest", no_args_is_help=True)
@@ -72,6 +73,58 @@ def gmail(
 
     typer.echo("Fetching and processing...")
     transcripts = fetch_transcripts(profile=resolved_profile, matches=matches)
+    _process_and_persist(transcripts, config)
+
+
+@app.command()
+def slack(
+    channel: Annotated[str | None, typer.Option(help="Slack channel ID")] = None,
+    days: Annotated[int | None, typer.Option(help="How many days back to search")] = None,
+    date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
+    date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
+) -> None:
+    config = load_config()
+    resolved_channel = channel or config.slack.channel
+
+    if not resolved_channel:
+        typer.echo("Error: No Slack channel configured. Set sources.slack.channel in .transcripts/config.yaml or use --channel.", err=True)
+        raise typer.Exit(code=1)
+
+    parsed_from = date.fromisoformat(date_from) if date_from else None
+    parsed_to = date.fromisoformat(date_to) if date_to else None
+    resolved_days = days or config.lookback_days
+
+    if parsed_from or parsed_to:
+        label = f"{date_from or '...'} to {date_to or '...'}"
+    else:
+        label = f"last {resolved_days} day(s)"
+    typer.echo(f"Searching Slack files in channel '{resolved_channel}' ({label})...")
+
+    try:
+        matches = slack_list(
+            channel=resolved_channel,
+            lookback_days=resolved_days,
+            date_from=parsed_from,
+            date_to=parsed_to,
+        )
+    except RuntimeError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1)
+
+    if not matches:
+        typer.echo("No transcripts found.")
+        return
+
+    typer.echo(f"Found {len(matches)} transcript(s):")
+    for m in matches:
+        typer.echo(f"  [{m.date}] {m.title or 'Untitled'} (file_id={m.file_id})")
+
+    if dry_run:
+        return
+
+    typer.echo("Fetching and processing...")
+    transcripts = slack_fetch(matches)
     _process_and_persist(transcripts, config)
 
 
