@@ -1,0 +1,184 @@
+import base64
+import re
+from dataclasses import dataclass
+from datetime import date, datetime
+from pathlib import Path
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+
+from transcript_cli.models import RawTranscript
+
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
+
+CREDENTIALS_DIR = Path.home() / ".config" / "transcript" / "credentials"
+CLIENT_SECRET_PATH = Path.home() / ".config" / "transcript" / "client_secret.json"
+
+GOOGLE_DOCS_URL_PATTERN = re.compile(
+    r"https://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)"
+)
+
+
+def get_credentials(profile: str) -> Credentials:
+    token_path = CREDENTIALS_DIR / f"{profile}.json"
+
+    if token_path.exists():
+        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+        if creds.valid:
+            return creds
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            token_path.write_text(creds.to_json())
+            return creds
+
+    if not CLIENT_SECRET_PATH.exists():
+        raise FileNotFoundError(
+            f"OAuth client secret not found. "
+            f"Place your client_secret.json at: {CLIENT_SECRET_PATH}"
+        )
+
+    flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET_PATH), SCOPES)
+    creds = flow.run_local_server(port=0)
+
+    CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
+    token_path.write_text(creds.to_json())
+
+    return creds
+
+
+def _extract_doc_ids(payload: dict) -> list[str]:
+    doc_ids: list[str] = []
+
+    body_data = payload.get("body", {}).get("data", "")
+    if body_data:
+        decoded = base64.urlsafe_b64decode(body_data).decode("utf-8", errors="replace")
+        doc_ids.extend(GOOGLE_DOCS_URL_PATTERN.findall(decoded))
+
+    for part in payload.get("parts", []):
+        doc_ids.extend(_extract_doc_ids(part))
+
+    return doc_ids
+
+
+def _get_email_date(headers: list[dict]) -> date:
+    for header in headers:
+        if header["name"].lower() == "date":
+            raw_date = header["value"]
+            for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%d %b %Y %H:%M:%S %z"):
+                try:
+                    return datetime.strptime(raw_date.strip(), fmt).date()
+                except ValueError:
+                    continue
+            break
+    return date.today()
+
+
+def _get_email_subject(headers: list[dict]) -> str | None:
+    for header in headers:
+        if header["name"].lower() == "subject":
+            return header["value"]
+    return None
+
+
+def _fetch_doc_text(drive_service, doc_id: str) -> str:
+    return (
+        drive_service.files()
+        .export(fileId=doc_id, mimeType="text/plain")
+        .execute()
+        .decode("utf-8")
+    )
+
+
+def build_query(sender: str, lookback_days: int, date_from: date | None = None, date_to: date | None = None, subject: str | None = None) -> str:
+    import calendar
+    from datetime import timedelta
+
+    today = date.today()
+    start = date_from or (today - timedelta(days=lookback_days - 1))
+    end = date_to or today
+    after_epoch = calendar.timegm(start.timetuple())
+    before_epoch = calendar.timegm((end + timedelta(days=1)).timetuple())
+    parts = []
+    if sender:
+        parts.append(f"from:{sender}")
+    if subject:
+        parts.append(f"subject:{subject}")
+    parts.append(f"after:{after_epoch}")
+    parts.append(f"before:{before_epoch}")
+    return " ".join(parts)
+
+
+@dataclass
+class EmailMatch:
+    date: date
+    subject: str | None
+    doc_id: str
+
+
+def list_emails(profile: str, query: str, subject_filter: str | None = None) -> list[EmailMatch]:
+    creds = get_credentials(profile)
+    gmail_service = build("gmail", "v1", credentials=creds)
+
+    results = (
+        gmail_service.users()
+        .messages()
+        .list(userId="me", q=query)
+        .execute()
+    )
+
+    messages = results.get("messages", [])
+    if not messages:
+        return []
+
+    matches: list[EmailMatch] = []
+    seen_doc_ids: set[str] = set()
+
+    for msg_ref in messages:
+        message = (
+            gmail_service.users()
+            .messages()
+            .get(userId="me", id=msg_ref["id"], format="full")
+            .execute()
+        )
+
+        headers = message.get("payload", {}).get("headers", [])
+        email_date = _get_email_date(headers)
+        subject = _get_email_subject(headers)
+
+        if subject_filter and subject and subject_filter.lower() not in subject.lower():
+            continue
+
+        doc_ids = _extract_doc_ids(message.get("payload", {}))
+
+        for doc_id in doc_ids:
+            if doc_id in seen_doc_ids:
+                continue
+            seen_doc_ids.add(doc_id)
+            matches.append(EmailMatch(date=email_date, subject=subject, doc_id=doc_id))
+
+    return matches
+
+
+def fetch_transcripts(profile: str, matches: list[EmailMatch]) -> list[RawTranscript]:
+    creds = get_credentials(profile)
+    drive_service = build("drive", "v3", credentials=creds)
+
+    transcripts: list[RawTranscript] = []
+    for match in matches:
+        text = _fetch_doc_text(drive_service, match.doc_id)
+        transcripts.append(
+            RawTranscript(
+                text=text,
+                source="gmail",
+                date=match.date,
+                source_id=match.doc_id,
+                title=match.subject,
+            )
+        )
+
+    return transcripts
