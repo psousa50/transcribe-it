@@ -28,9 +28,12 @@ class TranscriptConfig:
     local: LocalDestinationConfig = field(default_factory=LocalDestinationConfig)
 
 
+CONFIG_PATH = Path(".transcripts/config.yaml")
+
+
 def load_config(project_root: Path | None = None) -> TranscriptConfig:
     root = project_root or Path.cwd()
-    config_path = root / ".transcripts" / "config.yaml"
+    config_path = root / CONFIG_PATH
 
     if not config_path.exists():
         return TranscriptConfig()

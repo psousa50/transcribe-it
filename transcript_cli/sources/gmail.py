@@ -1,4 +1,5 @@
 import base64
+import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -17,7 +18,26 @@ SCOPES = [
 ]
 
 CREDENTIALS_DIR = Path.home() / ".config" / "transcript" / "credentials"
-CLIENT_SECRET_PATH = Path.home() / ".config" / "transcript" / "client_secret.json"
+
+
+def _build_oauth_client_config() -> dict:
+    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise RuntimeError(
+            "GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET must be set. "
+            "Run 'transcript init' to configure."
+        )
+    return {
+        "installed": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "redirect_uris": ["http://localhost"],
+        }
+    }
 
 GOOGLE_DOCS_URL_PATTERN = re.compile(
     r"https://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)"
@@ -36,13 +56,7 @@ def get_credentials(profile: str) -> Credentials:
             token_path.write_text(creds.to_json())
             return creds
 
-    if not CLIENT_SECRET_PATH.exists():
-        raise FileNotFoundError(
-            f"OAuth client secret not found. "
-            f"Place your client_secret.json at: {CLIENT_SECRET_PATH}"
-        )
-
-    flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET_PATH), SCOPES)
+    flow = InstalledAppFlow.from_client_config(_build_oauth_client_config(), SCOPES)
     creds = flow.run_local_server(port=0)
 
     CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
@@ -94,7 +108,13 @@ def _fetch_doc_text(drive_service, doc_id: str) -> str:
     )
 
 
-def build_query(sender: str, lookback_days: int, date_from: date | None = None, date_to: date | None = None, subject: str | None = None) -> str:
+def build_query(
+    sender: str,
+    lookback_days: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    subject: str | None = None,
+) -> str:
     import calendar
     from datetime import timedelta
 
@@ -120,16 +140,13 @@ class EmailMatch:
     doc_id: str
 
 
-def list_emails(profile: str, query: str, subject_filter: str | None = None) -> list[EmailMatch]:
+def list_emails(
+    profile: str, query: str, subject_filter: str | None = None
+) -> list[EmailMatch]:
     creds = get_credentials(profile)
     gmail_service = build("gmail", "v1", credentials=creds)
 
-    results = (
-        gmail_service.users()
-        .messages()
-        .list(userId="me", q=query)
-        .execute()
-    )
+    results = gmail_service.users().messages().list(userId="me", q=query).execute()
 
     messages = results.get("messages", [])
     if not messages:

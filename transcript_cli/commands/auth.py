@@ -23,6 +23,6 @@ def gmail(
         get_credentials(profile)
         typer.echo(f"Authenticated successfully for profile '{profile}'.")
         typer.echo(f"Credentials stored at: {token_path}")
-    except FileNotFoundError as e:
+    except RuntimeError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1)

@@ -1,30 +1,29 @@
+import hashlib
+import subprocess
 from datetime import date
-from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from transcript_cli.config import load_config
-from transcript_cli.pipeline.enrich import enrich
+from transcript_cli.models import RawTranscript
+from transcript_cli.pipeline.run import run
 from transcript_cli.sources.gmail import build_query, fetch_transcripts, list_emails
 from transcript_cli.sources.slack import fetch_transcripts as slack_fetch, list_files as slack_list
-from transcript_cli.storage.local import DuplicateTranscriptError, persist
 
 app = typer.Typer(name="ingest", no_args_is_help=True)
 
 
-def _process_and_persist(raw_transcripts, config):
-    for raw in raw_transcripts:
-        typer.echo(f"  [{raw.date}] {raw.title or 'Untitled'}")
+def _resolve_dates(date_from, date_to):
+    parsed_from = date.fromisoformat(date_from) if date_from else None
+    parsed_to = date.fromisoformat(date_to) if date_to else None
+    return parsed_from, parsed_to
 
-        enriched = enrich(raw, raw.text)
 
-        base_path = Path(config.local.path)
-        try:
-            output_dir = persist(enriched, base_path)
-            typer.echo(f"    Saved to {output_dir}")
-        except DuplicateTranscriptError:
-            typer.echo(f"    Skipped — already ingested")
+def _date_label(date_from, date_to, days):
+    if date_from or date_to:
+        return f"{date_from or '...'} to {date_to or '...'}"
+    return f"last {days} day(s)"
 
 
 @app.command()
@@ -38,20 +37,15 @@ def gmail(
 ) -> None:
     config = load_config()
     resolved_profile = profile or config.gmail.profile
+    parsed_from, parsed_to = _resolve_dates(date_from, date_to)
+    resolved_days = days or config.lookback_days
 
     if not config.gmail.sender:
         typer.echo("Error: No Gmail sender configured. Set sources.gmail.sender in .transcripts/config.yaml.", err=True)
         raise typer.Exit(code=1)
 
-    parsed_from = date.fromisoformat(date_from) if date_from else None
-    parsed_to = date.fromisoformat(date_to) if date_to else None
-    resolved_days = days or config.lookback_days
     resolved_query = build_query(config.gmail.sender, resolved_days, date_from=parsed_from, date_to=parsed_to, subject=subject)
-
-    if parsed_from or parsed_to:
-        label = f"{date_from or '...'} to {date_to or '...'}"
-    else:
-        label = f"last {resolved_days} day(s)"
+    label = _date_label(date_from, date_to, resolved_days)
     typer.echo(f"Searching emails with profile '{resolved_profile}' ({label})...")
 
     try:
@@ -64,16 +58,17 @@ def gmail(
         typer.echo("No transcripts found matching the query.")
         return
 
-    typer.echo(f"Found {len(matches)} transcript(s):")
-    for m in matches:
-        typer.echo(f"  [{m.date}] {m.subject or 'Untitled'} (doc_id={m.doc_id})")
+    def preview():
+        typer.echo(f"Found {len(matches)} transcript(s):")
+        for m in matches:
+            typer.echo(f"  [{m.date}] {m.subject or 'Untitled'} (doc_id={m.doc_id})")
 
-    if dry_run:
-        return
-
-    typer.echo("Fetching and processing...")
-    transcripts = fetch_transcripts(profile=resolved_profile, matches=matches)
-    _process_and_persist(transcripts, config)
+    run(
+        fetch=lambda: fetch_transcripts(profile=resolved_profile, matches=matches),
+        config=config,
+        dry_run=dry_run,
+        preview=preview,
+    )
 
 
 @app.command()
@@ -86,19 +81,14 @@ def slack(
 ) -> None:
     config = load_config()
     resolved_channel = channel or config.slack.channel
+    parsed_from, parsed_to = _resolve_dates(date_from, date_to)
+    resolved_days = days or config.lookback_days
 
     if not resolved_channel:
         typer.echo("Error: No Slack channel configured. Set sources.slack.channel in .transcripts/config.yaml or use --channel.", err=True)
         raise typer.Exit(code=1)
 
-    parsed_from = date.fromisoformat(date_from) if date_from else None
-    parsed_to = date.fromisoformat(date_to) if date_to else None
-    resolved_days = days or config.lookback_days
-
-    if parsed_from or parsed_to:
-        label = f"{date_from or '...'} to {date_to or '...'}"
-    else:
-        label = f"last {resolved_days} day(s)"
+    label = _date_label(date_from, date_to, resolved_days)
     typer.echo(f"Searching Slack files in channel '{resolved_channel}' ({label})...")
 
     try:
@@ -116,23 +106,51 @@ def slack(
         typer.echo("No transcripts found.")
         return
 
-    typer.echo(f"Found {len(matches)} transcript(s):")
-    for m in matches:
-        typer.echo(f"  [{m.date}] {m.title or 'Untitled'} (file_id={m.file_id})")
+    def preview():
+        typer.echo(f"Found {len(matches)} transcript(s):")
+        for m in matches:
+            typer.echo(f"  [{m.date}] {m.title or 'Untitled'} (file_id={m.file_id})")
 
-    if dry_run:
-        return
-
-    typer.echo("Fetching and processing...")
-    transcripts = slack_fetch(matches)
-    _process_and_persist(transcripts, config)
+    run(
+        fetch=lambda: slack_fetch(matches),
+        config=config,
+        dry_run=dry_run,
+        preview=preview,
+    )
 
 
 @app.command()
 def clipboard(
+    title: Annotated[str | None, typer.Option(help="Title for the transcript")] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
-    typer.echo("Not yet implemented")
+    try:
+        text = subprocess.run(["pbpaste"], capture_output=True, text=True, check=True).stdout
+    except FileNotFoundError:
+        typer.echo("Error: pbpaste not found. Clipboard source is only supported on macOS.", err=True)
+        raise typer.Exit(code=1)
+
+    if not text.strip():
+        typer.echo("Clipboard is empty.")
+        return
+
+    typer.echo(f"Read {len(text)} characters from clipboard.")
+
+    raw = RawTranscript(
+        text=text,
+        source="clipboard",
+        date=date.today(),
+        source_id=hashlib.sha256(text.encode()).hexdigest()[:16],
+        title=title,
+    )
+
+    config = load_config()
+    run(
+        fetch=lambda: [raw],
+        config=config,
+        dry_run=dry_run,
+        preview=lambda: typer.echo(f"  [preview] First 200 chars: {text[:200]}..."),
+    )
 
 
 @app.command()
