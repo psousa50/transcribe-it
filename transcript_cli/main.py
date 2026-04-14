@@ -1,3 +1,10 @@
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+GLOBAL_ENV_PATH = Path.home() / ".config" / "transcript" / "env"
+load_dotenv(dotenv_path=GLOBAL_ENV_PATH)
+
 import typer
 
 from transcript_cli.commands.auth import app as auth_app

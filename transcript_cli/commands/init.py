@@ -6,10 +6,11 @@ import typer
 import yaml
 
 from transcript_cli.config import CONFIG_PATH
+from transcript_cli.main import GLOBAL_ENV_PATH
 
 app = typer.Typer(name="init", invoke_without_command=True)
 
-ENV_PATH = Path(".env")
+ENV_PATH = GLOBAL_ENV_PATH
 
 LLM_PROVIDERS = {
     "Anthropic (Claude)": ("anthropic/claude-sonnet-4-20250514", "ANTHROPIC_API_KEY"),
@@ -78,6 +79,7 @@ def _write_env(values: dict[str, str]) -> None:
         return
 
     if not ENV_PATH.exists():
+        ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
         ENV_PATH.write_text("")
 
     lines = ENV_PATH.read_text().splitlines()

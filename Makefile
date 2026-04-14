@@ -1,7 +1,7 @@
 .PHONY: transcript install eval eval-view eval-clean promptfoo
 
 transcript:
-	bash -c 'set -a && source .env && set +a && uv run transcript $(ARGS)'
+	uv run transcript $(ARGS)
 
 install:
 	uv cache clean transcript-cli
