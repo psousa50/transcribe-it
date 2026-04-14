@@ -13,6 +13,7 @@ def run(
     fetch: Callable[[], list[RawTranscript]],
     config: TranscriptConfig,
     dry_run: bool = False,
+    clean: bool = False,
     preview: Callable[[], None] | None = None,
 ) -> None:
     if preview:
@@ -31,11 +32,11 @@ def run(
     for raw in transcripts:
         typer.echo(f"  [{raw.date}] {raw.title or 'Untitled'}")
 
-        enriched = enrich(raw, raw.text)
+        enriched = enrich(raw, raw.text, clean=clean)
 
         base_path = Path(config.local.path)
         try:
-            output_dir = persist(enriched, base_path)
+            output_dir = persist(enriched, base_path, clean=clean)
             typer.echo(f"    Saved to {output_dir}")
         except DuplicateTranscriptError:
             typer.echo("    Skipped — already ingested")

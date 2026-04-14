@@ -40,6 +40,8 @@ def _build_metadata(transcript: EnrichedTranscript) -> dict:
     return {
         "source": transcript.raw.source,
         "date": transcript.raw.date.isoformat(),
+        "title": transcript.raw.title,
+        "summary": transcript.summary,
         "participants": transcript.participants,
         "topics": transcript.topics,
         "source_id": transcript.raw.source_id,
@@ -56,7 +58,7 @@ def is_duplicate(base_path: Path, source_id: str) -> bool:
     return False
 
 
-def persist(transcript: EnrichedTranscript, base_path: Path) -> Path:
+def persist(transcript: EnrichedTranscript, base_path: Path, clean: bool = False) -> Path:
     source_id = transcript.raw.source_id
     if source_id is not None and is_duplicate(base_path, source_id):
         raise DuplicateTranscriptError(
@@ -69,10 +71,12 @@ def persist(transcript: EnrichedTranscript, base_path: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     (output_dir / "raw.txt").write_text(transcript.raw.text, encoding="utf-8")
-    (output_dir / "clean.md").write_text(_build_clean_md(transcript), encoding="utf-8")
     (output_dir / "metadata.json").write_text(
         json.dumps(_build_metadata(transcript), indent=2) + "\n",
         encoding="utf-8",
     )
+
+    if clean:
+        (output_dir / "clean.md").write_text(_build_clean_md(transcript), encoding="utf-8")
 
     return output_dir

@@ -33,6 +33,7 @@ def gmail(
     date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
     date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
     subject: Annotated[str | None, typer.Option(help="Filter by email subject")] = None,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     config = load_config()
@@ -67,6 +68,7 @@ def gmail(
         fetch=lambda: fetch_transcripts(profile=resolved_profile, matches=matches),
         config=config,
         dry_run=dry_run,
+        clean=clean,
         preview=preview,
     )
 
@@ -77,6 +79,7 @@ def slack(
     days: Annotated[int | None, typer.Option(help="How many days back to search")] = None,
     date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
     date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     config = load_config()
@@ -115,6 +118,7 @@ def slack(
         fetch=lambda: slack_fetch(matches),
         config=config,
         dry_run=dry_run,
+        clean=clean,
         preview=preview,
     )
 
@@ -122,6 +126,7 @@ def slack(
 @app.command()
 def clipboard(
     title: Annotated[str | None, typer.Option(help="Title for the transcript")] = None,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     try:
@@ -149,6 +154,7 @@ def clipboard(
         fetch=lambda: [raw],
         config=config,
         dry_run=dry_run,
+        clean=clean,
         preview=lambda: typer.echo(f"  [preview] First 200 chars: {text[:200]}..."),
     )
 
@@ -156,6 +162,37 @@ def clipboard(
 @app.command()
 def file(
     path: Annotated[str, typer.Argument(help="Path to transcript file")],
+    title: Annotated[str | None, typer.Option(help="Title for the transcript")] = None,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
-    typer.echo("Not yet implemented")
+    from pathlib import Path
+
+    file_path = Path(path)
+    if not file_path.exists():
+        typer.echo(f"Error: File not found: {path}", err=True)
+        raise typer.Exit(code=1)
+
+    text = file_path.read_text(encoding="utf-8")
+    if not text.strip():
+        typer.echo("File is empty.")
+        return
+
+    typer.echo(f"Read {len(text)} characters from {file_path}")
+
+    raw = RawTranscript(
+        text=text,
+        source="file",
+        date=date.today(),
+        source_id=hashlib.sha256(text.encode()).hexdigest()[:16],
+        title=title or file_path.stem,
+    )
+
+    config = load_config()
+    run(
+        fetch=lambda: [raw],
+        config=config,
+        dry_run=dry_run,
+        clean=clean,
+        preview=lambda: typer.echo(f"  [preview] First 200 chars: {text[:200]}..."),
+    )

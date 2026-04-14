@@ -26,14 +26,17 @@ def _parse_response(content: str) -> dict:
     return json.loads(text)
 
 
-def enrich(raw: RawTranscript, normalised_text: str) -> EnrichedTranscript:
+def enrich(raw: RawTranscript, normalised_text: str, clean: bool = False) -> EnrichedTranscript:
     model = os.environ.get("TRANSCRIPT_MODEL")
     if not model:
         raise RuntimeError("TRANSCRIPT_MODEL not set. Add it to your .env file.")
+
+    prompt_name = "enrich-clean" if clean else "enrich"
+
     response = litellm.completion(
         model=model,
         messages=[
-            {"role": "system", "content": _load_prompt("enrich")},
+            {"role": "system", "content": _load_prompt(prompt_name)},
             {"role": "user", "content": normalised_text},
         ],
         response_format={"type": "json_object"},
