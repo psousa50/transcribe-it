@@ -6,7 +6,7 @@ import litellm
 
 from transcript_cli.models import EnrichedTranscript, RawTranscript
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
+PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
 
 def _load_prompt(name: str, **kwargs: str) -> str:

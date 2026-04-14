@@ -1,10 +1,11 @@
-.PHONY: auth transcript eval eval-view eval-clean promptfoo
+.PHONY: transcript install eval eval-view eval-clean promptfoo
 
 transcript:
 	bash -c 'set -a && source .env && set +a && uv run transcript $(ARGS)'
 
-auth:
-	bash -c 'set -a && source .env && set +a && uv run transcript auth gmail $(ARGS)'
+install:
+	uv cache clean transcript-cli
+	uv tool install . --force --reinstall
 
 eval:
 	bash -c 'set -a && source .env && set +a && cd evals && promptfoo eval $(ARGS)'
