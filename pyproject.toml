@@ -1,6 +1,6 @@
 [project]
 name = "transcribe-it"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lightweight CLI for ingesting, enriching, and storing meeting transcripts"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -44,4 +44,4 @@ Repository = "https://github.com/psousa50/transcribe-it"
 Issues = "https://github.com/psousa50/transcribe-it/issues"
 
 [project.scripts]
-transcribe = "transcribe_it.main:app"
+transcribe-it = "transcribe_it.main:app"

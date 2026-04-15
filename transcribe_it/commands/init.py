@@ -117,7 +117,7 @@ def _prompt_llm() -> dict[str, str]:
 def _print_next_steps(sources: list[str]) -> None:
     typer.echo("\nNext steps:")
     if "gmail" in sources:
-        typer.echo("  - Authenticate with Gmail: transcribe auth gmail")
+        typer.echo("  - Authenticate with Gmail: transcribe-it auth gmail")
     if "slack" in sources:
         typer.echo("  - Invite your Slack bot to the channels you want to ingest from")
 

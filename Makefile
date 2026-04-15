@@ -1,7 +1,7 @@
-.PHONY: transcribe install eval eval-view eval-clean promptfoo
+.PHONY: transcribe-it install eval eval-view eval-clean promptfoo
 
-transcribe:
-	uv run transcribe $(ARGS)
+transcribe-it:
+	uv run transcribe-it $(ARGS)
 
 install:
 	uv cache clean transcribe-it
