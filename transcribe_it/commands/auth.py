@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from transcript_cli.sources.gmail import CREDENTIALS_DIR, get_credentials
+from transcribe_it.sources.gmail import CREDENTIALS_DIR, get_credentials
 
 app = typer.Typer(name="auth", no_args_is_help=True)
 

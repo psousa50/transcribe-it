@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from transcript_cli.models import RawTranscript
+from transcribe_it.models import RawTranscript
 
 
 @dataclass

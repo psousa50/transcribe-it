@@ -4,7 +4,7 @@ from pathlib import Path
 
 import litellm
 
-from transcript_cli.models import EnrichedTranscript, RawTranscript
+from transcribe_it.models import EnrichedTranscript, RawTranscript
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 

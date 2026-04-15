@@ -7,9 +7,9 @@ load_dotenv(dotenv_path=GLOBAL_ENV_PATH)
 
 import typer
 
-from transcript_cli.commands.auth import app as auth_app
-from transcript_cli.commands.ingest import app as ingest_app
-from transcript_cli.commands.init import app as init_app
+from transcribe_it.commands.auth import app as auth_app
+from transcribe_it.commands.ingest import app as ingest_app
+from transcribe_it.commands.init import app as init_app
 
 app = typer.Typer(name="transcript", no_args_is_help=True)
 app.add_typer(init_app, name="init")

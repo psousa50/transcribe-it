@@ -10,7 +10,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from transcript_cli.models import RawTranscript
+from transcribe_it.models import RawTranscript
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",

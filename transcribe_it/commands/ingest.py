@@ -5,11 +5,11 @@ from typing import Annotated
 
 import typer
 
-from transcript_cli.config import load_config
-from transcript_cli.models import RawTranscript
-from transcript_cli.pipeline.run import run
-from transcript_cli.sources.gmail import build_query, fetch_transcripts, list_emails
-from transcript_cli.sources.slack import fetch_transcripts as slack_fetch, list_files as slack_list
+from transcribe_it.config import load_config
+from transcribe_it.models import RawTranscript
+from transcribe_it.pipeline.run import run
+from transcribe_it.sources.gmail import build_query, fetch_transcripts, list_emails
+from transcribe_it.sources.slack import fetch_transcripts as slack_fetch, list_files as slack_list
 
 app = typer.Typer(name="ingest", no_args_is_help=True)
 

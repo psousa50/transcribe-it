@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from transcript_cli.models import EnrichedTranscript
+from transcribe_it.models import EnrichedTranscript
 
 
 class DuplicateTranscriptError(Exception):

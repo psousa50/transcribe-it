@@ -3,10 +3,10 @@ from pathlib import Path
 
 import typer
 
-from transcript_cli.config import TranscriptConfig
-from transcript_cli.models import RawTranscript
-from transcript_cli.pipeline.enrich import enrich
-from transcript_cli.storage.local import DuplicateTranscriptError, persist
+from transcribe_it.config import TranscriptConfig
+from transcribe_it.models import RawTranscript
+from transcribe_it.pipeline.enrich import enrich
+from transcribe_it.storage.local import DuplicateTranscriptError, persist
 
 
 def run(

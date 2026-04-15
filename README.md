@@ -57,7 +57,7 @@ destinations:
 ### 5. Authenticate with Gmail
 
 ```bash
-uv run transcript auth gmail
+uv run transcribe auth gmail
 ```
 
 ## Usage
@@ -81,7 +81,7 @@ make ingest ARGS="--days 1 --dry-run"
 Or without Make:
 
 ```bash
-uv run transcript ingest gmail --days 1
+uv run transcribe ingest gmail --days 1
 ```
 
 ### Output
@@ -104,8 +104,8 @@ LLM prompts live in `prompts/` as markdown files. Edit `prompts/enrich.md` to ch
 
 | Command | Description |
 |---------|-------------|
-| `transcript auth gmail` | Authenticate with Gmail (OAuth) |
-| `transcript ingest gmail` | Ingest transcripts from Gmail |
+| `transcribe auth gmail` | Authenticate with Gmail (OAuth) |
+| `transcribe ingest gmail` | Ingest transcripts from Gmail |
 
 ### Ingest options
 

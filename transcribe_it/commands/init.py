@@ -5,8 +5,8 @@ import questionary
 import typer
 import yaml
 
-from transcript_cli.config import CONFIG_PATH
-from transcript_cli.main import GLOBAL_ENV_PATH
+from transcribe_it.config import CONFIG_PATH
+from transcribe_it.main import GLOBAL_ENV_PATH
 
 app = typer.Typer(name="init", invoke_without_command=True)
 
@@ -117,7 +117,7 @@ def _prompt_llm() -> dict[str, str]:
 def _print_next_steps(sources: list[str]) -> None:
     typer.echo("\nNext steps:")
     if "gmail" in sources:
-        typer.echo("  - Authenticate with Gmail: transcript auth gmail")
+        typer.echo("  - Authenticate with Gmail: transcribe auth gmail")
     if "slack" in sources:
         typer.echo("  - Invite your Slack bot to the channels you want to ingest from")
 
