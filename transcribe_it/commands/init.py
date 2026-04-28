@@ -85,7 +85,7 @@ def init(
         sources[key] = prompt_fn()
         selected.append(key)
 
-    output_path = questionary.text("\nOutput directory for transcripts:", default=".transcripts/").ask()
+    output_path = questionary.text("\nOutput directory for transcripts:", default="transcripts/").ask()
     lookback_days = questionary.text("Default lookback period (days):", default="7").ask()
 
     config = {

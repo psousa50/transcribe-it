@@ -92,14 +92,14 @@ transcribe-it ingest file path/to/transcript.txt
 Raw mode (default) writes a single `.txt` file per transcript:
 
 ```
-.transcripts/
+transcripts/
   2026-04-09-ai-labs-daily.txt
 ```
 
 With `--enrich`, each transcript becomes a folder:
 
 ```
-.transcripts/
+transcripts/
   2026-04-09-ai-labs-daily/
     raw.txt          # Original transcript (immutable)
     metadata.json    # Source, date, participants, topics, summary
