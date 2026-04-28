@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from transcribe_it.models import EnrichedTranscript
+from transcribe_it.models import EnrichedTranscript, RawTranscript
 
 
 class DuplicateTranscriptError(Exception):
@@ -80,3 +80,16 @@ def persist(transcript: EnrichedTranscript, base_path: Path, clean: bool = False
         (output_dir / "clean.md").write_text(_build_clean_md(transcript), encoding="utf-8")
 
     return output_dir
+
+
+def persist_raw(raw: RawTranscript, base_path: Path) -> Path:
+    slug = _slugify(raw.title)
+    date_str = raw.date.isoformat()
+    output_file = base_path / f"{date_str}-{slug}.txt"
+
+    if output_file.exists():
+        raise DuplicateTranscriptError(f"Transcript already exists at {output_file}")
+
+    base_path.mkdir(parents=True, exist_ok=True)
+    output_file.write_text(raw.text, encoding="utf-8")
+    return output_file

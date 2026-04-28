@@ -1,113 +1,120 @@
-# Transcript CLI
+# transcribe-it
 
-A lightweight CLI for ingesting meeting transcripts from Gmail, enriching them with an LLM, and storing the results as local files.
+A lightweight CLI for ingesting meeting transcripts (Gmail or Slack), enriching them with an LLM, and storing the results as local files.
 
 ```
-Gmail -> Extract Google Doc -> LLM Enrich -> Local Files
+Source -> Extract -> LLM Enrich -> Local Files
 ```
 
 ## Prerequisites
 
 - Python 3.12+
-- [uv](https://docs.astral.sh/uv/)
-- A Google Cloud project with Gmail API and Google Drive API enabled
-- An Anthropic API key (for LLM enrichment)
+- A Google Cloud project with Gmail API + Google Drive API enabled (for the Gmail source), or a Slack bot token (for the Slack source)
+- An API key for one of the supported LLM providers (Anthropic, OpenAI, or Groq) — only needed if you want LLM enrichment
+
+## Install
+
+```bash
+uv tool install transcribe-it
+```
+
+Or with pipx:
+
+```bash
+pipx install transcribe-it
+```
 
 ## Setup
 
-### 1. Install dependencies
+Run the interactive setup from the directory where you want transcripts to be stored:
 
 ```bash
-uv sync
+transcribe-it init
 ```
 
-### 2. Configure Google OAuth
+This will:
 
-Create an OAuth 2.0 Client ID (Desktop app) in your Google Cloud Console, download the JSON, and place it at:
+- Ask which sources to enable (Gmail, Slack)
+- Prompt for the credentials each source needs
+- Optionally let you pick an LLM provider and store the API key (skip this if you only want raw transcripts)
+- Write `.transcripts/config.yaml` in the current directory
+- Write secrets to `~/.config/transcript/env`
 
-```
-~/.config/transcript/client_secret.json
-```
+### Gmail credentials
 
-### 3. Set your API key
+For Gmail you'll be asked for `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`. Two options:
 
-Create a `.env` file in the project root:
+1. **Reuse someone else's OAuth client** — ask a teammate for the values and have them add your Google account as a Test user on their OAuth consent screen.
+2. **Create your own** — in Google Cloud Console, create an OAuth 2.0 Client ID of type *Desktop app*, then copy the client ID and secret from the resulting credentials.
 
-```
-ANTHROPIC_API_KEY=your-key-here
-```
-
-### 4. Configure the project
-
-Edit `.transcripts/config.yaml`:
-
-```yaml
-sources:
-  gmail:
-    profile: default
-    sender: gemini-notes@google.com
-
-lookback_days: 7
-
-destinations:
-  - type: local
-    path: .transcripts/
-```
-
-### 5. Authenticate with Gmail
+After `init`, authenticate:
 
 ```bash
-uv run transcribe-it auth gmail
+transcribe-it auth gmail
 ```
+
+### Slack credentials
+
+For Slack you'll be asked for the channel ID and a bot token (`xoxb-...`). The bot needs to be a member of the channels you want to ingest from.
 
 ## Usage
 
-### Ingest transcripts
+By default, ingestion only extracts the raw transcript — no LLM call, no API key required. Pass `--enrich` to also generate a summary, topics, and participants via LLM.
 
 ```bash
-# Last 7 days (default)
-make ingest
+# Last N days, raw extraction only (default)
+transcribe-it ingest gmail --days 7
 
-# Today only
-make ingest ARGS="--days 1"
+# With LLM enrichment
+transcribe-it ingest gmail --days 7 --enrich
+
+# Enrichment + cleaned transcript variant (--clean implies --enrich)
+transcribe-it ingest gmail --days 7 --clean
 
 # Specific date range
-make ingest ARGS="--from 2026-04-01 --to 2026-04-05"
+transcribe-it ingest gmail --from 2026-04-01 --to 2026-04-05
 
-# Preview what will be ingested (no fetching, no LLM, no writing)
-make ingest ARGS="--days 1 --dry-run"
-```
+# Preview matching emails without fetching or writing
+transcribe-it ingest gmail --days 1 --dry-run
 
-Or without Make:
-
-```bash
-uv run transcribe-it ingest gmail --days 1
+# Ingest a single transcript file directly
+transcribe-it ingest file path/to/transcript.txt
 ```
 
 ### Output
 
-Each transcript produces three files under `.transcripts/`:
+Raw mode (default) writes a single `.txt` file per transcript:
+
+```
+.transcripts/
+  2026-04-09-ai-labs-daily.txt
+```
+
+With `--enrich`, each transcript becomes a folder:
 
 ```
 .transcripts/
   2026-04-09-ai-labs-daily/
     raw.txt          # Original transcript (immutable)
-    clean.md         # Structured: title, summary, topics, clean transcript
-    metadata.json    # Source, date, participants, topics
+    metadata.json    # Source, date, participants, topics, summary
 ```
+
+With `--clean`, an additional `clean.md` is written (structured: title, summary, topics, cleaned transcript).
 
 ### Prompts
 
-LLM prompts live in `prompts/` as markdown files. Edit `prompts/enrich.md` to change how transcripts are processed.
+LLM prompts are bundled with the package under `transcribe_it/prompts/`. To customise, fork the repo and edit `prompts/enrich.md`.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
+| `transcribe-it init` | Interactive setup for sources, credentials, and LLM |
 | `transcribe-it auth gmail` | Authenticate with Gmail (OAuth) |
 | `transcribe-it ingest gmail` | Ingest transcripts from Gmail |
+| `transcribe-it ingest file PATH` | Ingest a single transcript file |
 
-### Ingest options
+### Ingest options (Gmail)
 
 | Flag | Description |
 |------|-------------|
@@ -116,3 +123,12 @@ LLM prompts live in `prompts/` as markdown files. Edit `prompts/enrich.md` to ch
 | `--to YYYY-MM-DD` | End date |
 | `--profile NAME` | Gmail auth profile |
 | `--dry-run` | List matching emails without processing |
+| `--enrich` | Run LLM enrichment (summary, topics, participants) |
+| `--clean` | Also generate a cleaned version of the transcript (implies `--enrich`) |
+
+## Configuration files
+
+| Path | Purpose |
+|------|---------|
+| `.transcripts/config.yaml` | Per-project: sources, lookback, output destinations |
+| `~/.config/transcript/env` | Global: API keys and OAuth credentials |

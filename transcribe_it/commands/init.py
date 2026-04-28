@@ -105,6 +105,12 @@ def _write_env(values: dict[str, str]) -> None:
 
 def _prompt_llm() -> dict[str, str]:
     typer.echo("\nLLM configuration:")
+    enable = questionary.confirm(
+        "Enable LLM enrichment? (skip if you only want raw transcripts)",
+        default=False,
+    ).ask()
+    if not enable:
+        return {}
     provider_label = questionary.select(
         "Which LLM provider do you want to use?",
         choices=list(LLM_PROVIDERS.keys()),

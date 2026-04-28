@@ -33,7 +33,8 @@ def gmail(
     date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
     date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
     subject: Annotated[str | None, typer.Option(help="Filter by email subject")] = None,
-    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
+    enrich: Annotated[bool, typer.Option("--enrich", help="Run LLM enrichment (summary, topics, participants)")] = False,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript (implies --enrich)")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     config = load_config()
@@ -68,6 +69,7 @@ def gmail(
         fetch=lambda: fetch_transcripts(profile=resolved_profile, matches=matches),
         config=config,
         dry_run=dry_run,
+        enrich_transcripts=enrich,
         clean=clean,
         preview=preview,
     )
@@ -79,7 +81,8 @@ def slack(
     days: Annotated[int | None, typer.Option(help="How many days back to search")] = None,
     date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
     date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
-    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
+    enrich: Annotated[bool, typer.Option("--enrich", help="Run LLM enrichment (summary, topics, participants)")] = False,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript (implies --enrich)")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     config = load_config()
@@ -118,6 +121,7 @@ def slack(
         fetch=lambda: slack_fetch(matches),
         config=config,
         dry_run=dry_run,
+        enrich_transcripts=enrich,
         clean=clean,
         preview=preview,
     )
@@ -126,7 +130,8 @@ def slack(
 @app.command()
 def clipboard(
     title: Annotated[str | None, typer.Option(help="Title for the transcript")] = None,
-    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
+    enrich: Annotated[bool, typer.Option("--enrich", help="Run LLM enrichment (summary, topics, participants)")] = False,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript (implies --enrich)")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     try:
@@ -154,6 +159,7 @@ def clipboard(
         fetch=lambda: [raw],
         config=config,
         dry_run=dry_run,
+        enrich_transcripts=enrich,
         clean=clean,
         preview=lambda: typer.echo(f"  [preview] First 200 chars: {text[:200]}..."),
     )
@@ -163,7 +169,8 @@ def clipboard(
 def file(
     path: Annotated[str, typer.Argument(help="Path to transcript file")],
     title: Annotated[str | None, typer.Option(help="Title for the transcript")] = None,
-    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript")] = False,
+    enrich: Annotated[bool, typer.Option("--enrich", help="Run LLM enrichment (summary, topics, participants)")] = False,
+    clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript (implies --enrich)")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     from pathlib import Path
@@ -193,6 +200,7 @@ def file(
         fetch=lambda: [raw],
         config=config,
         dry_run=dry_run,
+        enrich_transcripts=enrich,
         clean=clean,
         preview=lambda: typer.echo(f"  [preview] First 200 chars: {text[:200]}..."),
     )
