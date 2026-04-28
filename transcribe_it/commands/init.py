@@ -70,7 +70,7 @@ def _write_env(values: dict[str, str]) -> None:
         if key in existing:
             if existing[key] == value:
                 continue
-            if questionary.confirm(f"{key} already set in .env. Overwrite?", default=False).ask():
+            if questionary.confirm(f"{key} already set in {ENV_PATH}. Overwrite?", default=False).ask():
                 updates[key] = value
         else:
             updates[key] = value
