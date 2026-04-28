@@ -26,28 +26,34 @@ pipx install transcribe-it
 
 ## Setup
 
-Run the interactive setup from the directory where you want transcripts to be stored:
+Setup is split into two steps: a one-off global step for credentials, and a per-project step for what to ingest.
+
+### Step 1: Configure credentials (once per machine)
+
+```bash
+transcribe-it setup
+```
+
+Pick which credentials to set up — Google OAuth (for Gmail), Slack bot token, and/or LLM provider — and the values are written to `~/.config/transcript/env`. Re-run any time to add or rotate values; existing values are preserved unless you confirm overwrite (or pass `--force`).
+
+### Step 2: Initialise a project (per directory)
+
+From the directory where you want transcripts to land:
 
 ```bash
 transcribe-it init
 ```
 
-This will:
-
-- Ask which sources to enable (Gmail, Slack)
-- Prompt for the credentials each source needs
-- Optionally let you pick an LLM provider and store the API key (skip this if you only want raw transcripts)
-- Write `.transcripts/config.yaml` in the current directory
-- Write secrets to `~/.config/transcript/env`
+This asks which sources to enable, source-specific config (sender filter, channel ID, etc.), output path, and lookback window. Writes `.transcripts/config.yaml`. No secrets prompts — it'll warn if the credentials a chosen source needs aren't set yet.
 
 ### Gmail credentials
 
-For Gmail you'll be asked for `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`. Two options:
+`setup` asks for `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`. Two options:
 
 1. **Reuse someone else's OAuth client** — ask a teammate for the values and have them add your Google account as a Test user on their OAuth consent screen.
 2. **Create your own** — in Google Cloud Console, create an OAuth 2.0 Client ID of type *Desktop app*, then copy the client ID and secret from the resulting credentials.
 
-After `init`, authenticate:
+After `setup` and `init`, authenticate:
 
 ```bash
 transcribe-it auth gmail
@@ -55,7 +61,7 @@ transcribe-it auth gmail
 
 ### Slack credentials
 
-For Slack you'll be asked for the channel ID and a bot token (`xoxb-...`). The bot needs to be a member of the channels you want to ingest from.
+`setup` asks for `SLACK_BOT_TOKEN` (`xoxb-...`). The bot needs to be a member of the channels you want to ingest from. The channel ID itself is configured per-project in `init`.
 
 ## Usage
 
@@ -109,7 +115,8 @@ LLM prompts are bundled with the package under `transcribe_it/prompts/`. To cust
 
 | Command | Description |
 |---------|-------------|
-| `transcribe-it init` | Interactive setup for sources, credentials, and LLM |
+| `transcribe-it setup` | Configure global credentials (OAuth, LLM, Slack token) |
+| `transcribe-it init` | Initialise project config (sources, output path, lookback) |
 | `transcribe-it auth gmail` | Authenticate with Gmail (OAuth) |
 | `transcribe-it ingest gmail` | Ingest transcripts from Gmail |
 | `transcribe-it ingest file PATH` | Ingest a single transcript file |
