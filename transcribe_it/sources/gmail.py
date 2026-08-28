@@ -1,4 +1,5 @@
 import base64
+import fnmatch
 import os
 import re
 from dataclasses import dataclass
@@ -108,12 +109,35 @@ def _fetch_doc_text(drive_service, doc_id: str) -> str:
     )
 
 
+def _is_glob(pattern: str) -> bool:
+    return any(ch in pattern for ch in "*?")
+
+
+def subject_matches(subject: str | None, patterns: list[str]) -> bool:
+    if not patterns:
+        return True
+    if not subject:
+        return False
+    lowered = subject.lower()
+    return any(
+        fnmatch.fnmatch(lowered, p.lower()) if _is_glob(p) else p.lower() in lowered
+        for p in patterns
+    )
+
+
+def _subject_clause(patterns: list[str]) -> str | None:
+    if not patterns or any(_is_glob(p) for p in patterns):
+        return None
+    terms = " OR ".join(f'"{p}"' for p in patterns)
+    return f"subject:({terms})"
+
+
 def build_query(
     sender: str,
     lookback_days: int,
     date_from: date | None = None,
     date_to: date | None = None,
-    subject: str | None = None,
+    subjects: list[str] | None = None,
 ) -> str:
     import calendar
     from datetime import timedelta
@@ -126,8 +150,9 @@ def build_query(
     parts = []
     if sender:
         parts.append(f"from:{sender}")
-    if subject:
-        parts.append(f"subject:{subject}")
+    clause = _subject_clause(subjects or [])
+    if clause:
+        parts.append(clause)
     parts.append(f"after:{after_epoch}")
     parts.append(f"before:{before_epoch}")
     return " ".join(parts)
@@ -141,7 +166,7 @@ class EmailMatch:
 
 
 def list_emails(
-    profile: str, query: str, subject_filter: str | None = None
+    profile: str, query: str, subject_filters: list[str] | None = None
 ) -> list[EmailMatch]:
     creds = get_credentials(profile)
     gmail_service = build("gmail", "v1", credentials=creds)
@@ -167,7 +192,7 @@ def list_emails(
         email_date = _get_email_date(headers)
         subject = _get_email_subject(headers)
 
-        if subject_filter and subject and subject_filter.lower() not in subject.lower():
+        if not subject_matches(subject, subject_filters or []):
             continue
 
         doc_ids = _extract_doc_ids(message.get("payload", {}))

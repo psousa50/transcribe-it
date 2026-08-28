@@ -18,8 +18,12 @@ REQUIRED_ENV = {
 def _prompt_gmail() -> dict:
     typer.echo("\nGmail configuration:")
     sender = questionary.text("Sender email to filter by (e.g. gemini-notes@google.com):").ask()
+    subject = questionary.text(
+        "Subject filters (comma-separated, * wildcards allowed, blank for any):"
+    ).ask()
+    subjects = [p.strip() for p in (subject or "").split(",") if p.strip()]
     profile = questionary.text("Auth profile name:", default="default").ask()
-    return {"profile": profile, "sender": sender}
+    return {"profile": profile, "sender": sender, "subject": subjects}
 
 
 def _prompt_slack() -> dict:

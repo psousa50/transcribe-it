@@ -44,7 +44,7 @@ From the directory where you want transcripts to land:
 transcribe-it init
 ```
 
-This asks which sources to enable, source-specific config (sender filter, channel ID, etc.), output path, and lookback window. Writes `.transcripts/config.yaml`. No secrets prompts — it'll warn if the credentials a chosen source needs aren't set yet.
+This asks which sources to enable, source-specific config (sender filter, subject filter, channel ID, etc.), output path, and lookback window. Writes `.transcripts/config.yaml`. No secrets prompts — it'll warn if the credentials a chosen source needs aren't set yet.
 
 ### Gmail credentials
 
@@ -128,10 +128,32 @@ LLM prompts are bundled with the package under `transcribe_it/prompts/`. To cust
 | `--days N` | How many days back to search |
 | `--from YYYY-MM-DD` | Start date |
 | `--to YYYY-MM-DD` | End date |
+| `--subject TEXT` | Only emails whose subject matches TEXT; repeatable, `*`/`?` wildcards (overrides config) |
 | `--profile NAME` | Gmail auth profile |
 | `--dry-run` | List matching emails without processing |
 | `--enrich` | Run LLM enrichment (summary, topics, participants) |
 | `--clean` | Also generate a cleaned version of the transcript (implies `--enrich`) |
+
+### Subject filters
+
+By default every email from the configured sender is ingested. To narrow it down, set `subject` under `sources.gmail` — a single string or a list:
+
+```yaml
+sources:
+  gmail:
+    sender: gemini-notes@google.com
+    subject:
+      - AI Labs
+      - Weekly*Review
+```
+
+A pattern with no wildcards matches anywhere in the subject, so `AI Labs` matches *"Notes: AI Labs daily"*. A pattern containing `*` or `?` is matched against the whole subject instead, so `Weekly*Review` matches *"Weekly Team Review"* but not *"Notes: Weekly Team Review"* — write `*Weekly*Review*` if you want both. Matching is case-insensitive, and an email is kept if **any** pattern matches.
+
+`--subject` overrides the config for one run and can be repeated:
+
+```bash
+transcribe-it ingest gmail --subject "AI Labs" --subject "Standup*"
+```
 
 ## Configuration files
 

@@ -8,6 +8,7 @@ import yaml
 class GmailSourceConfig:
     profile: str = "default"
     sender: str = ""
+    subjects: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -31,6 +32,14 @@ class TranscriptConfig:
 CONFIG_PATH = Path(".transcripts/config.yaml")
 
 
+def _as_patterns(value) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    return [p.strip() for p in value if str(p).strip()]
+
+
 def load_config(project_root: Path | None = None) -> TranscriptConfig:
     root = project_root or Path.cwd()
     config_path = root / CONFIG_PATH
@@ -44,6 +53,7 @@ def load_config(project_root: Path | None = None) -> TranscriptConfig:
     gmail = GmailSourceConfig(
         profile=gmail_raw.get("profile", "default"),
         sender=gmail_raw.get("sender", ""),
+        subjects=_as_patterns(gmail_raw.get("subject")),
     )
 
     destinations = raw.get("destinations", [])

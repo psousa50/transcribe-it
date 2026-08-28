@@ -32,7 +32,7 @@ def gmail(
     days: Annotated[int | None, typer.Option(help="How many days back to search")] = None,
     date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
     date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
-    subject: Annotated[str | None, typer.Option(help="Filter by email subject")] = None,
+    subject: Annotated[list[str] | None, typer.Option(help="Subject filter; repeatable, * and ? wildcards, overrides config")] = None,
     enrich: Annotated[bool, typer.Option("--enrich", help="Run LLM enrichment (summary, topics, participants)")] = False,
     clean: Annotated[bool, typer.Option("--clean", help="Also generate a cleaned version of the transcript (implies --enrich)")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
@@ -41,17 +41,18 @@ def gmail(
     resolved_profile = profile or config.gmail.profile
     parsed_from, parsed_to = _resolve_dates(date_from, date_to)
     resolved_days = days or config.lookback_days
+    resolved_subjects = list(subject) if subject else config.gmail.subjects
 
     if not config.gmail.sender:
         typer.echo("Error: No Gmail sender configured. Set sources.gmail.sender in .transcripts/config.yaml.", err=True)
         raise typer.Exit(code=1)
 
-    resolved_query = build_query(config.gmail.sender, resolved_days, date_from=parsed_from, date_to=parsed_to, subject=subject)
+    resolved_query = build_query(config.gmail.sender, resolved_days, date_from=parsed_from, date_to=parsed_to, subjects=resolved_subjects)
     label = _date_label(date_from, date_to, resolved_days)
     typer.echo(f"Searching emails with profile '{resolved_profile}' ({label})...")
 
     try:
-        matches = list_emails(profile=resolved_profile, query=resolved_query, subject_filter=subject)
+        matches = list_emails(profile=resolved_profile, query=resolved_query, subject_filters=resolved_subjects)
     except FileNotFoundError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(code=1)
