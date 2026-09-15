@@ -9,7 +9,7 @@ class DuplicateTranscriptError(Exception):
     pass
 
 
-def _slugify(title: str | None, max_length: int = 50) -> str:
+def _slugify(title: str | None, max_length: int = 80) -> str:
     text = (title or "untitled").lower()
     text = re.sub(r"[^a-z0-9]+", "-", text)
     text = text.strip("-")
