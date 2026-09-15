@@ -1,11 +1,12 @@
 import hashlib
 import subprocess
+from dataclasses import replace
 from datetime import date
 from typing import Annotated
 
 import typer
 
-from transcribe_it.config import load_config
+from transcribe_it.config import GmailSourceConfig, load_config
 from transcribe_it.models import RawTranscript
 from transcribe_it.pipeline.run import run
 from transcribe_it.sources.gmail import build_query, fetch_transcripts, list_emails
@@ -26,9 +27,16 @@ def _date_label(date_from, date_to, days):
     return f"last {days} day(s)"
 
 
+def _select_accounts(accounts: list[GmailSourceConfig], profile: str | None) -> list[GmailSourceConfig]:
+    if not profile:
+        return accounts
+    matching = [a for a in accounts if a.profile == profile]
+    return matching or [replace(accounts[0], profile=profile)]
+
+
 @app.command()
 def gmail(
-    profile: Annotated[str | None, typer.Option(help="Gmail auth profile")] = None,
+    profile: Annotated[str | None, typer.Option(help="Restrict the run to one Gmail account (default: all configured)")] = None,
     days: Annotated[int | None, typer.Option(help="How many days back to search")] = None,
     date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
     date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
@@ -38,36 +46,53 @@ def gmail(
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without writing files")] = False,
 ) -> None:
     config = load_config()
-    resolved_profile = profile or config.gmail.profile
+    accounts = _select_accounts(config.gmail, profile)
     parsed_from, parsed_to = _resolve_dates(date_from, date_to)
     resolved_days = days or config.lookback_days
-    resolved_subjects = list(subject) if subject else config.gmail.subjects
-
-    if not config.gmail.sender:
-        typer.echo("Error: No Gmail sender configured. Set sources.gmail.sender in .transcripts/config.yaml.", err=True)
-        raise typer.Exit(code=1)
-
-    resolved_query = build_query(config.gmail.sender, resolved_days, date_from=parsed_from, date_to=parsed_to, subjects=resolved_subjects)
     label = _date_label(date_from, date_to, resolved_days)
-    typer.echo(f"Searching emails with profile '{resolved_profile}' ({label})...")
 
-    try:
-        matches = list_emails(profile=resolved_profile, query=resolved_query, subject_filters=resolved_subjects)
-    except FileNotFoundError as e:
-        typer.echo(f"Error: {e}", err=True)
+    unconfigured = [a.profile for a in accounts if not a.sender]
+    if unconfigured:
+        typer.echo(
+            f"Error: No Gmail sender configured for profile(s) {', '.join(unconfigured)}. "
+            "Set sources.gmail.sender in .transcripts/config.yaml.",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
-    if not matches:
+    found: list[tuple[GmailSourceConfig, list]] = []
+    for account in accounts:
+        subjects = list(subject) if subject else account.subjects
+        query = build_query(account.sender, resolved_days, date_from=parsed_from, date_to=parsed_to, subjects=subjects)
+        typer.echo(f"Searching emails with profile '{account.profile}' ({label})...")
+
+        try:
+            matches = list_emails(profile=account.profile, query=query, subject_filters=subjects)
+        except FileNotFoundError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(code=1)
+
+        if matches:
+            found.append((account, matches))
+
+    if not found:
         typer.echo("No transcripts found matching the query.")
         return
 
     def preview():
-        typer.echo(f"Found {len(matches)} transcript(s):")
-        for m in matches:
-            typer.echo(f"  [{m.date}] {m.subject or 'Untitled'} (doc_id={m.doc_id})")
+        for account, matches in found:
+            typer.echo(f"Found {len(matches)} transcript(s) for profile '{account.profile}':")
+            for m in matches:
+                typer.echo(f"  [{m.date}] {m.subject or 'Untitled'} (doc_id={m.doc_id})")
+
+    def fetch():
+        transcripts = []
+        for account, matches in found:
+            transcripts.extend(fetch_transcripts(profile=account.profile, matches=matches))
+        return transcripts
 
     run(
-        fetch=lambda: fetch_transcripts(profile=resolved_profile, matches=matches),
+        fetch=fetch,
         config=config,
         dry_run=dry_run,
         enrich_transcripts=enrich,

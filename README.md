@@ -117,7 +117,7 @@ LLM prompts are bundled with the package under `transcribe_it/prompts/`. To cust
 |---------|-------------|
 | `transcribe-it setup` | Configure global credentials (OAuth, LLM, Slack token) |
 | `transcribe-it init` | Initialise project config (sources, output path, lookback) |
-| `transcribe-it auth gmail` | Authenticate with Gmail (OAuth) |
+| `transcribe-it auth gmail` | Authenticate with Gmail (OAuth); `--profile NAME` for a second account |
 | `transcribe-it ingest gmail` | Ingest transcripts from Gmail |
 | `transcribe-it ingest file PATH` | Ingest a single transcript file |
 
@@ -129,7 +129,7 @@ LLM prompts are bundled with the package under `transcribe_it/prompts/`. To cust
 | `--from YYYY-MM-DD` | Start date |
 | `--to YYYY-MM-DD` | End date |
 | `--subject TEXT` | Only emails whose subject matches TEXT; repeatable, `*`/`?` wildcards (overrides config) |
-| `--profile NAME` | Gmail auth profile |
+| `--profile NAME` | Restrict the run to one Gmail account (default: all configured) |
 | `--dry-run` | List matching emails without processing |
 | `--enrich` | Run LLM enrichment (summary, topics, participants) |
 | `--clean` | Also generate a cleaned version of the transcript (implies `--enrich`) |
@@ -153,6 +153,41 @@ A pattern with no wildcards matches anywhere in the subject, so `AI Labs` matche
 
 ```bash
 transcribe-it ingest gmail --subject "AI Labs" --subject "Standup*"
+```
+
+### Multiple Gmail accounts
+
+Each account is a *profile* — a name for its own OAuth token, stored at `~/.config/transcript/credentials/<profile>.json`. To pull from more than one account into the same project, list them under `sources.gmail`, each with its own sender and subject filters:
+
+```yaml
+sources:
+  gmail:
+    - profile: personal
+      sender: gemini-notes@google.com
+    - profile: work
+      sender: notes@zoom.us
+      subject:
+        - Weekly*Review
+```
+
+Authenticate each one separately:
+
+```bash
+transcribe-it auth gmail --profile personal
+transcribe-it auth gmail --profile work
+```
+
+`transcribe-it ingest gmail` then searches every configured account and writes the results to the same output directory; a transcript that reaches both accounts is only ingested once. `--profile NAME` restricts the run to one account.
+
+Both profiles use the OAuth client from `~/.config/transcript/env`, so each Google account must be a Test user on that OAuth consent screen.
+
+The single-account form stays valid:
+
+```yaml
+sources:
+  gmail:
+    profile: default
+    sender: gemini-notes@google.com
 ```
 
 ## Configuration files

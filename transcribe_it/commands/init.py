@@ -15,15 +15,28 @@ REQUIRED_ENV = {
 }
 
 
-def _prompt_gmail() -> dict:
-    typer.echo("\nGmail configuration:")
+def _prompt_gmail_account(taken: list[str]) -> dict:
     sender = questionary.text("Sender email to filter by (e.g. gemini-notes@google.com):").ask()
     subject = questionary.text(
         "Subject filters (comma-separated, * wildcards allowed, blank for any):"
     ).ask()
     subjects = [p.strip() for p in (subject or "").split(",") if p.strip()]
-    profile = questionary.text("Auth profile name:", default="default").ask()
-    return {"profile": profile, "sender": sender, "subject": subjects}
+    while True:
+        profile = questionary.text("Auth profile name:", default="default").ask()
+        if profile not in taken:
+            return {"profile": profile, "sender": sender, "subject": subjects}
+        typer.echo(f"Profile '{profile}' is already used by another account. Pick a different name.", err=True)
+
+
+def _prompt_gmail() -> dict | list:
+    typer.echo("\nGmail configuration:")
+    accounts = [_prompt_gmail_account([])]
+
+    while questionary.confirm("Add another Gmail account?", default=False).ask():
+        typer.echo("")
+        accounts.append(_prompt_gmail_account([a["profile"] for a in accounts]))
+
+    return accounts if len(accounts) > 1 else accounts[0]
 
 
 def _prompt_slack() -> dict:
@@ -54,10 +67,13 @@ def _warn_missing_env(selected_sources: list[str]) -> None:
         )
 
 
-def _print_next_steps(sources: list[str]) -> None:
+def _print_next_steps(sources: dict) -> None:
     typer.echo("\nNext steps:")
-    if "gmail" in sources:
-        typer.echo("  - Authenticate with Gmail: transcribe-it auth gmail")
+    gmail = sources.get("gmail")
+    if gmail:
+        accounts = gmail if isinstance(gmail, list) else [gmail]
+        for account in accounts:
+            typer.echo(f"  - Authenticate with Gmail: transcribe-it auth gmail --profile {account['profile']}")
     if "slack" in sources:
         typer.echo("  - Invite your Slack bot to the channels you want to ingest from")
 
@@ -105,4 +121,4 @@ def init(
     typer.echo(f"\nConfig written to {CONFIG_PATH}")
 
     _warn_missing_env(selected)
-    _print_next_steps(selected)
+    _print_next_steps(sources)

@@ -24,7 +24,7 @@ class LocalDestinationConfig:
 @dataclass
 class TranscriptConfig:
     lookback_days: int = 7
-    gmail: GmailSourceConfig = field(default_factory=GmailSourceConfig)
+    gmail: list[GmailSourceConfig] = field(default_factory=lambda: [GmailSourceConfig()])
     slack: SlackSourceConfig = field(default_factory=SlackSourceConfig)
     local: LocalDestinationConfig = field(default_factory=LocalDestinationConfig)
 
@@ -50,11 +50,16 @@ def load_config(project_root: Path | None = None) -> TranscriptConfig:
     raw = yaml.safe_load(config_path.read_text()) or {}
 
     gmail_raw = raw.get("sources", {}).get("gmail", {})
-    gmail = GmailSourceConfig(
-        profile=gmail_raw.get("profile", "default"),
-        sender=gmail_raw.get("sender", ""),
-        subjects=_as_patterns(gmail_raw.get("subject")),
-    )
+    if isinstance(gmail_raw, dict):
+        gmail_raw = [gmail_raw]
+    gmail = [
+        GmailSourceConfig(
+            profile=entry.get("profile", "default"),
+            sender=entry.get("sender", ""),
+            subjects=_as_patterns(entry.get("subject")),
+        )
+        for entry in gmail_raw
+    ] or [GmailSourceConfig()]
 
     destinations = raw.get("destinations", [])
     local_path = ".transcripts/"
