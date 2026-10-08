@@ -1740,7 +1740,7 @@ wheels = [
 
 [[package]]
 name = "transcribe-it"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "." }
 dependencies = [
     { name = "google-api-python-client" },

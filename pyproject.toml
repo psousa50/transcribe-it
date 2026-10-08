@@ -1,6 +1,6 @@
 [project]
 name = "transcribe-it"
-version = "0.5.0"
+version = "0.5.1"
 description = "Lightweight CLI for ingesting, enriching, and storing meeting transcripts"
 readme = "README.md"
 requires-python = ">=3.12"
